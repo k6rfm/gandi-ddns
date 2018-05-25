@@ -3,14 +3,53 @@
 apikey = XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
 # domain
+# if set to null, the suffix from socket.getfqdn() will be used.  Note
+# socket.getfqdn() requires the host to be configured with the DNS
+# search suffix; this is often not done (especially on Windows.)
+# Most things work fine if it is not done, so just because stuff
+# seems to work, don't assume your hosts are configured correctly.
 domain = example.com
 
-# A-record name (@, dev, home, etc) that will be updated
+# 'A' (IPv4) record name (@, dev, home, etc) that will be updated
 # example is for raspbian.example.com
-a_name = raspbian 
+# if set to null, the prefix from socket.getfqdn() will be used.  See
+# above, but the prefix (hostname) is usually setup, even on Windows.
+
+a_name = raspbian
+
+# 'AAAA' (IPv6 "quad A") record name (@, dev, home, etc) that will be
+# updated example is for raspbian.example.com. if set to null, the
+# value used for 'a_name' will be used.
+
+aaaa_name =
+
+# protocols to support.  if null, '4' will be assumed.
+# if set to    action
+# 4            update A record with IPv4 address.  Do nothing with
+#              AAAA records.
+# 6            update AAAA record with IPv6 address. Do nothing with
+#              A records.
+# 46 or 64     update A record with IPv6 address and update AAAA
+#              record with IPv6 address
+protocols = 4
+
+# verbosity level, controls how many messages the script emits.
+# default is 3 which is appropriate for interactive use when first
+# setting up the script. Once it's working and
+# the script is run out of a cron job,
+# a lower level would be appropriate (I use level 1.)
+
+# if set to     Message level
+# 0             quietest.  error messages only.
+# 1             quiet. message only if a dns change is made
+# 2             chatty. message every execution even if no change made
+# 3             chattiest, progress is reported as we go along.
+verbosity = 3
 
 # TTL (seconds)
 ttl = 900
 
-# Production API
+# Production API. Be sure to include the trailing '/'.
 api = https://dns.api.gandi.net/api/v5/
+
+
