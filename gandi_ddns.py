@@ -6,6 +6,7 @@ import json
 import ipaddress
 import socket
 from datetime import datetime
+import msg
 
 config_file = "config.txt"
 
@@ -24,21 +25,25 @@ def get_ip(protocol):
     try:
         r = requests.get(ip_service, timeout=3)
     except Exception:
-        print('Failed to retrieve external IP from ', ipservice)
+        m.put(ERROR,'Failed to retrieve external IPv%s address from %s' % (
+            protocol,
+            ipservice))
         sys.exit(2)
     if r.status_code != 200:
-        print(('Failed to retrieve external IP. Server responded with status_code: %d' % r.status_code))
+        m.put(ERROR, 'Failed to retrieve external IPv%s address. ' % (
+            protocol))
+        m.put(ERROR, ('Server responded with status_code: %d' %
+                            r.status_code))
         sys.exit(2)
 
     ip = r.text.rstrip() # strip \n and any trailing whitespace
-
     if protocol == '4':
         if not(ipaddress.IPv4Address(ip)): # check if valid IPv4 address
-            print('Bogus response %s from %s' % (ip, ip_service))
+            m.put(ERROR,'Bogus response %s from %s' % (ip, ip_service))
             sys.exit(2)
     if protocol == '6':
         if not(ipaddress.IPv6Address(ip)): # check if valid IPv6 address
-            print('Bogus response %s from %s' % (ip, ip_service))
+            m.put(ERROR,'Bogus response %s from %s' % (ip, ip_service))
             sys.exit(2)
     return ip
 
@@ -48,22 +53,57 @@ def read_config(config_path):
     cfg.read(config_path)
     return cfg
 
-def get_record(url, headers):
+def apply_config_defaults(sec):
+    fqdn = socket.getfqdn().split('.',1)
+    if not sec.get('domain'):
+        if len(fqdn) != 2:
+            m.put(ERROR,'System host name not qualified, fix system config or supply domain in config.txt')
+            sys.exit(2)
+        sec['domain'] = fqdn[1]
+    if not sec.get('a_name'):
+        if len(fqdn) < 1:
+            m.put(ERROR,'System host name not configured, fix system config or supply a_name in config.txt')
+            sys.exit(2)
+        sec['a_name'] = fqdn[0]
+    if not sec.get('aaaa_name'):
+        sec['aaaa_name'] = sec.get('a_name')
+    if not sec.get('protocols'):
+        sec['protocols'] = '4'
+    if sec['protocols'] not in ['4', '6', '46', '64']:
+        m.put(ERROR,'Invalid protocols value \"%s\", fix config.txt' % (
+            sec['protocols']))
+        sys.exit(2)
+    if not sec.get('ttl'):
+        sec['ttl'] = '900'
+    if not sec.get('api'):
+       sec['api'] = 'https://dns.api.gandi.net/api/v5/'
+
+def hdrs(cfg):
+    #Set headers
+    return { 'Content-Type': 'application/json',
+             'X-Api-Key': '%s' % cfg['apikey']}
+
+
+
+def get_record(cfg):
     # Get existing record
-    r = requests.get(url, headers=headers)
+    r = requests.get(cfg['url'], headers=hdrs(cfg))
     return r
 
-def update_record(url, headers, config, section, external_ip):
+def update_record(m, cfg, external_ip):
     # Prepare record
-    payload = {'rrset_ttl':    config.get(section, 'ttl'),
+    payload = {'rrset_ttl':    cfg['ttl'],
                'rrset_values': [external_ip]}
     # Add record
-    r = requests.put(url, headers=headers, json=payload)
+    r = requests.put(cfg['url'], headers=hdrs(cfg), json=payload)
+
     if r.status_code == 201:
-        print('Zone record updated.')
+        m.put(msg.INFO,'Zone %s %s/%s record updated.' % (
+            cfg['domain'], cfg['recordname'], cfg['recordtype']))
     else:
-        print(('Record update failed with status code: %d' % r.status_code))
-        print((r.text))
+        m.put(msg.ERROR,'Record update failed with status code: %d' %
+                r.status_code)
+        m.put(msg.ERROR,(r.text))
     return r
 
 
@@ -72,7 +112,6 @@ def main():
     # than 3.5.x, but that's the earliest I tested with
     assert sys.version_info >= (3,5)
 
-    RECORD_TYPE = {'4': 'A', '6': 'AAAA'}
 
     path = config_file
     if not path.startswith('/'):
@@ -81,51 +120,52 @@ def main():
     if not config:
         sys.exit("Please fill in the 'config.txt' file.")
 
-    # TODO: apply defaults for unset values, check that protocols is
-    # what we need
-
     for section in config.sections():
-        for protocol in config.get(section, 'protocols'):
-            print('%s - section %s - IPv%s' % (
+        # don't iterate over config, that will process the DEFAULT section
+        sec = config[section]
+        apply_config_defaults(sec)
+        m = msg.Msg();
+        m.setlevel(sec['verbosity'])
+        for protocol in sec['protocols']:
+            m.put(msg.INFO,'%s - section %s - IPv%s' % (
                    str(datetime.now()),
                    section,
                    protocol))
-            # retrieve names
-            names = {'4': config.get(section, 'a_name'),
-                     '6': config.get(section, 'aaaa_name')}
-            #Retrieve API key
-            apikey = config.get(section, 'apikey')
 
-            #Set headers
-            headers = { 'Content-Type': 'application/json',
-                        'X-Api-Key': '%s' % config.get(section, 'apikey')}
+            # deduce DNS record type
+            sec['recordtype'] = {'4': 'A', '6': 'AAAA'}[protocol]
+            # deduce DNS record name
+            sec['recordname'] = {'4': sec['a_name'],
+                                 '6': sec['aaaa_name']}[protocol]
+
+
 
             # Set URL. It ends up looking like:
-            # https://dns.api.gandi.net/api/v5/domains/pensfa.org/raspian/A
-            url = '%sdomains/%s/records/%s/%s' % (
-                config.get(section, 'api'),
-                config.get(section, 'domain'),
-                names[protocol],
-                RECORD_TYPE[protocol])
-            print('Request API URL is: %s' % url)
+            # https://dns.api.gandi.net/api/v5/domains/example.com/raspian/A
+            sec['url'] = '%sdomains/%s/records/%s/%s' % (
+                sec['api'],
+                sec['domain'],
+                sec['recordname'],
+                sec['recordtype'])
+            m.put(msg.INFO,'Request API URL is: %s' % sec['url'])
 
 
             # Check current record
-            record = get_record(url, headers)
+            record = get_record(sec)
 
             if record.status_code != 200:
                 # Discover External IP
                 external_ip = get_ip(protocol)
-                print('No old %s record, adding as %s' % (
-                        RECORD_TYPE[protocol],
+                m.put(msg.ACTION,'No old %s record, adding as %s' % (
+                        sec['recordtype'],
                         external_ip))
 
-                update_record(url, headers, config, section, external_ip)
+                update_record(m,sec, external_ip)
             else:
                 old_ip = json.loads(record.text)['rrset_values'][0]
-                print('Current %s record value is: %s' % (
-                        RECORD_TYPE[protocol],
-                        old_ip))
+                m.put(msg.INFO,'Current %s record value is: %s' % (
+                    sec['recordtype'],
+                    old_ip))
 
                 # this is a very particular quirk for my own home config.
                 # if there is a nonroutable IP address in an A record,
@@ -140,23 +180,28 @@ def main():
 
                 if (protocol == '4' and
                     ipaddress.IPv4Address(old_ip).is_private):
-                    print('Not updating %s record for %s, check config' % (
-                            names[protocol],
-                            old_ip))
+                    m.put(msg.ERROR,
+                            'Not updating %s record for %s, check config' % (
+                                names[protocol],
+                                old_ip))
                     continue # next protocol
 
 
                 # Discover External IP
                 external_ip = get_ip(protocol)
-                print(('External IP is: %s' % external_ip))
+                m.put(msg.INFO,'External IP is: %s' % external_ip)
 
                 if old_ip == external_ip:
-                    print('No change in IP address. Goodbye.')
+                    m.put(msg.NOACTION,
+                          'No change in IPv%s address, nothing done.' % (
+                              protocol))
                 else:
-                    print('Old address was %s, updating to %s' % (
-                            old_ip,
-                            external_ip))
-                    update_record(url, headers, config, section, external_ip)
+                    m.put(msg.ACTION,'Updating %s/%s from %s to %s' % (
+                        sec['recordname'],
+                        sec['recordtype'],
+                        old_ip,
+                        external_ip))
+                    update_record(m, sec, external_ip)
             continue # next protocol
         continue # next config secion
 
