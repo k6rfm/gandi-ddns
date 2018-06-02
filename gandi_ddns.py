@@ -12,7 +12,7 @@ config_file = "config.txt"
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 
-def get_ip(protocol):
+def get_ip(m,protocol):
     # ifconfig.co has separate names for v4 and v6, so we use it.
     # api.ipify.org handles both, but with the same site name,
     # and forcing requiest.get to use a particular protocol is
@@ -85,7 +85,7 @@ def hdrs(cfg):
 
 
 
-def get_record(cfg):
+def get_record(m, cfg):
     # Get existing record
     r = requests.get(cfg['url'], headers=hdrs(cfg))
     return r
@@ -151,11 +151,11 @@ def main():
 
 
             # Check current record
-            record = get_record(sec)
+            record = get_record(m,sec)
 
             if record.status_code != 200:
                 # Discover External IP
-                external_ip = get_ip(protocol)
+                external_ip = get_ip(m,protocol)
                 m.put(msg.ACTION,'No old %s record, adding as %s' % (
                         sec['recordtype'],
                         external_ip))
@@ -188,7 +188,7 @@ def main():
 
 
                 # Discover External IP
-                external_ip = get_ip(protocol)
+                external_ip = get_ip(m,protocol)
                 m.put(msg.INFO,'External IP is: %s' % external_ip)
 
                 if old_ip == external_ip:
