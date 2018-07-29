@@ -13,38 +13,33 @@ config_file = "config.txt"
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 def get_ip(m,protocol):
-    # ifconfig.co has separate names for v4 and v6, so we use it.
-    # api.ipify.org handles both, but with the same site name,
-    # and forcing requiest.get to use a particular protocol is
-    # unpleasant (must fiddle with underlying socket.)
-    # running a curl command would work since curl has protocol
-    # options, but a fork/exec is unesthetic..
-    ip_service = 'https://v%s.ifconfig.co/ip' % protocol
+    # ifconfig.co is used as api.ipify.org doesn't do ipv6 (the
+    # docs say it does, and I suspect the server code would work,
+    # but api.ipify.org doesn't have a AAAA record because the underlying
+    # web service doesn't do v6)
+    # ifconfig.co used to allow v4 and v6 subdomains to force
+    # protocols, but as of 2018-07-25 it no longer does.
+    # forcing requests.get to use a particular protocol is
+    # unpleasant (must fiddle with underlying socket) so
+    # we run curl in a popen.
+    #  x =
+    curlcmd = 'curl -s%s http://ifconfig.co/' % protocol
 
     #Get external IP
     try:
-        r = requests.get(ip_service, timeout=3)
-    except Exception:
-        m.put(ERROR,'Failed to retrieve external IPv%s address from %s' % (
-            protocol,
-            ipservice))
-        sys.exit(2)
-    if r.status_code != 200:
-        m.put(ERROR, 'Failed to retrieve external IPv%s address. ' % (
-            protocol))
-        m.put(ERROR, ('Server responded with status_code: %d' %
-                            r.status_code))
-        sys.exit(2)
+        ip = os.popen(curlcmd).read().rstrip()
+        if protocol == '4':
+            if not(ipaddress.IPv4Address(ip)): # check if valid IPv4 address
+                m.put(ERROR,'Bogus response %s from %s' % (ip, ip_service))
+                sys.exit(2)
 
-    ip = r.text.rstrip() # strip \n and any trailing whitespace
-    if protocol == '4':
-        if not(ipaddress.IPv4Address(ip)): # check if valid IPv4 address
-            m.put(ERROR,'Bogus response %s from %s' % (ip, ip_service))
-            sys.exit(2)
-    if protocol == '6':
-        if not(ipaddress.IPv6Address(ip)): # check if valid IPv6 address
-            m.put(ERROR,'Bogus response %s from %s' % (ip, ip_service))
-            sys.exit(2)
+        if protocol == '6':
+            if not(ipaddress.IPv6Address(ip)): # check if valid IPv6 address
+                m.put(ERROR,'Bogus response %s from %s' % (ip, ip_service))
+                sys.exit(2)
+    except Exception:
+        m.put(ERROR,'% failed somehow' % curlcmd)
+        sys.exit(2)
     return ip
 
 def read_config(config_path):
