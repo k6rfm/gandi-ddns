@@ -26,19 +26,26 @@ def get_ip(m,protocol):
     curlcmd = 'curl -s%s http://ifconfig.co/' % protocol
 
     #Get external IP
+    p = os.popen(curlcmd)
+    ip = p.read().rstrip()
+    rc = p.close()
+    if rc:
+        m.put(msg.ERROR,'Return code %d from %s' % (rc, curlcmd))
+        sys.exit(2)
+    if ip == "":
+        m.put(msg.ERROR,'Did not get ip from %s' % (rc, curlcmd))
     try:
-        ip = os.popen(curlcmd).read().rstrip()
         if protocol == '4':
             if not(ipaddress.IPv4Address(ip)): # check if valid IPv4 address
-                m.put(ERROR,'Bogus response %s from %s' % (ip, ip_service))
+                m.put(msg.ERROR,'Bogus response %s from %s' % (ip, ip_service))
                 sys.exit(2)
 
         if protocol == '6':
             if not(ipaddress.IPv6Address(ip)): # check if valid IPv6 address
-                m.put(ERROR,'Bogus response %s from %s' % (ip, ip_service))
+                m.put(msg.ERROR,'Bogus response %s from %s' % (ip, ip_service))
                 sys.exit(2)
     except Exception:
-        m.put(ERROR,'% failed somehow' % curlcmd)
+        m.put(msg.ERROR,'% failed somehow' % curlcmd)
         sys.exit(2)
     return ip
 
@@ -52,12 +59,12 @@ def apply_config_defaults(sec):
     fqdn = socket.getfqdn().split('.',1)
     if not sec.get('domain'):
         if len(fqdn) != 2:
-            m.put(ERROR,'System host name not qualified, fix system config or supply domain in config.txt')
+            m.put(msg.ERROR,'System host name not qualified, fix system config or supply domain in config.txt')
             sys.exit(2)
         sec['domain'] = fqdn[1]
     if not sec.get('a_name'):
         if len(fqdn) < 1:
-            m.put(ERROR,'System host name not configured, fix system config or supply a_name in config.txt')
+            m.put(msg.ERROR,'System host name not configured, fix system config or supply a_name in config.txt')
             sys.exit(2)
         sec['a_name'] = fqdn[0]
     if not sec.get('aaaa_name'):
@@ -65,7 +72,7 @@ def apply_config_defaults(sec):
     if not sec.get('protocols'):
         sec['protocols'] = '4'
     if sec['protocols'] not in ['4', '6', '46', '64']:
-        m.put(ERROR,'Invalid protocols value \"%s\", fix config.txt' % (
+        m.put(msg.ERROR,'Invalid protocols value \"%s\", fix config.txt' % (
             sec['protocols']))
         sys.exit(2)
     if not sec.get('ttl'):
