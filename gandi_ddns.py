@@ -151,7 +151,12 @@ def main():
                 sec['recordtype'])
             m.put(msg.INFO,'Request API URL is: %s' % sec['url'])
 
-
+            # I'm getting a bunch of failures (oddly, at the top
+            # of the hour) on this.  Seems that it would be better to
+            # look up the record in DNS first rather than bother
+            # Gandi every time. (Hmm, I wonder if the top-of-the-hour
+            # failures are caused by cron jobs hammering Gandi then?
+            
             # Check current record
             record = get_record(m,sec)
 
