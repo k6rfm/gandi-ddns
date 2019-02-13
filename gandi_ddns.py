@@ -151,16 +151,42 @@ def main():
                 sec['recordtype'])
             m.put(msg.INFO,'Request API URL is: %s' % sec['url'])
 
-            # I'm getting a bunch of failures (oddly, at the top
-            # of the hour) on this.  Seems that it would be better to
-            # look up the record in DNS first rather than bother
-            # Gandi every time. (Hmm, I wonder if the top-of-the-hour
-            # failures are caused by cron jobs hammering Gandi then?
+            # Recently I started getting occasional 502 ("Bad Gateway")
+            # errors.  Interestingly, this only happens when I run
+            # the script from a cron job, and only at the run
+            # at the top of the hour (hh:00),  The runs at
+            # hh:20 and hh:40 never fail and another system whic runs
+            # hourly at hh:07 never fails.  My guess is that there are
+            # a lot of people running some form of dns update from
+            # cron, with a run at the top of the hour, resulting in
+            # server overload (kind of a unintentional DDOS.)
+
+            # To combat this, if a 502 error is received, wait a little
+            # and retry, but give up if the error persists.  I'm also
+            # going to change my cron job to move off the top of the hour.
             
             # Check current record
-            record = get_record(m,sec)
+
+            max_retries = 5
+            retry_delay = 23
+
+            for attempt in range(max_retries):
+                record = get_record(m,sec)
+                if record.status_code != 502:
+                    break
+                time.sleep(retry_delay)
+
+            if record.status_code == 502:
+                m.put(msg.ACTION,
+                      'Got error %d repeatedly fetching %s record. Giving up.' %
+                      (record.status_code,
+                       sec['recordtype']))
+                sys.exit(2);
 
             if record.status_code != 200:
+                m.put(msg.ACTION,'Got error %d fetching %s record.' %
+                      (record.status_code,
+                       sec['recordtype']))
                 # Discover External IP
                 external_ip = get_ip(m,protocol)
                 m.put(msg.ACTION,'No old %s record, adding as %s' % (

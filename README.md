@@ -20,14 +20,20 @@ Requirements:
 You can then run the script as a cron job :
 
 ```
-*/15 * * * * python3 /home/user/gandi-ddns/gandi_ddns.py
+7,22,37,52 * * * * python3 /home/user/gandi-ddns/gandi_ddns.py
 ```
 or on a systemd/journald system try
 ```
-*/20 *  * * * systemd-cat -t "ddns" python3 /home/user/gandi-ddns/gandi_ddns.py
+6,26,46 * * * * systemd-cat -t "ddns" python3 /home/user/gandi-ddns/gandi_ddns.py
 ```
 to route any messages to the journal/syslog, rather than getting those annoying
-cron emails
+cron emails.
+
+I recommend setting the cron job to not run exactly at the top of the
+hour (hh:00) since I sometimes got temporary failures accessing the
+Gandi servers then. I suspect there are a lot of people running DNS
+updates at that time, causing server overload.  Pick some more random times,
+don't everybody use the ones in my examples.
 
 macOS (not tested by k6rfm, inherited)
 
