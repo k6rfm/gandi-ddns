@@ -1,5 +1,6 @@
 import configparser as configparser
 import sys
+import time
 import os
 import requests
 import json
@@ -175,6 +176,11 @@ def main():
                 record = get_record(m,sec)
                 if record.status_code != 502:
                     break
+                m.put(msg.INFO,
+                      'Got error %d fetching %s record. Retry %d.' %
+                      (record.status_code,
+                       sec['recordtype'],
+                       attempt))
                 time.sleep(retry_delay)
 
             if record.status_code == 502:
@@ -219,7 +225,7 @@ def main():
                             'Not updating %s record for %s, check config' % (
                                 names[protocol],
                                 old_ip))
-                    continue # next protocol
+                    continue # next protlocol
 
 
                 # Discover External IP
