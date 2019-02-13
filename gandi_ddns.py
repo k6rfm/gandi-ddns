@@ -21,8 +21,9 @@ def get_ip(m,protocol):
     # protocols, but as of 2018-07-25 it no longer does.
     # forcing requests.get to use a particular protocol is
     # unpleasant (must fiddle with underlying socket) so
-    # we run curl in a popen.
-    #  x =
+    # we run curl in a popen.  This unfortunately means the 
+    # script won't run on Windows.
+
     curlcmd = 'curl -s%s http://ifconfig.co/' % protocol
 
     #Get external IP
@@ -183,10 +184,8 @@ def main():
                        sec['recordtype']))
                 sys.exit(2);
 
-            if record.status_code != 200:
-                m.put(msg.ACTION,'Got error %d fetching %s record.' %
-                      (record.status_code,
-                       sec['recordtype']))
+            if record.status_code == 404:
+                # no old record, add it
                 # Discover External IP
                 external_ip = get_ip(m,protocol)
                 m.put(msg.ACTION,'No old %s record, adding as %s' % (
@@ -194,7 +193,8 @@ def main():
                         external_ip))
 
                 update_record(m,sec, external_ip)
-            else:
+            elif record.status_code == 200:
+                # old record exists, check and replace if needed
                 old_ip = json.loads(record.text)['rrset_values'][0]
                 m.put(msg.INFO,'Current %s record value is: %s' % (
                     sec['recordtype'],
@@ -209,7 +209,9 @@ def main():
                 # since the systems where <hostname>.my.domain/A is set to
                 # an unroutable IP should be configured to only update
                 # the AAAA records, and I doubt anybody else is crazy
-                # enough to put private IPs in DNS....
+                # enough to put private IPs in DNS (I actually don't
+                # even do it any more since I now depend on mDNS
+                # for local name resolution, which is much saner.)
 
                 if (protocol == '4' and
                     ipaddress.IPv4Address(old_ip).is_private):
@@ -235,6 +237,15 @@ def main():
                         old_ip,
                         external_ip))
                     update_record(m, sec, external_ip)
+            else:
+                # some unexpected condition fetching old record.
+                # perhaps config is bad or api has changed?
+                m.put(msg.ERROR,'Got error %d fetching %s record. Stop.' %
+                      (record.status_code,
+                       sec['recordtype']))
+                sys.exit(2)
+                
+                
             continue # next protocol
         continue # next config secion
 
