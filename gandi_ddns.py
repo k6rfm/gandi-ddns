@@ -176,7 +176,7 @@ def main():
                 record = get_record(m,sec)
                 if record.status_code != 502:
                     break
-                m.put(msg.INFO,
+                m.put(msg.ERROR,
                       'Got error %d fetching %s record. Retry %d.' %
                       (record.status_code,
                        sec['recordtype'],
@@ -184,7 +184,7 @@ def main():
                 time.sleep(retry_delay)
 
             if record.status_code == 502:
-                m.put(msg.ACTION,
+                m.put(msg.ERROR,
                       'Got error %d repeatedly fetching %s record. Giving up.' %
                       (record.status_code,
                        sec['recordtype']))
