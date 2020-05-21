@@ -47,7 +47,7 @@ def get_ip(m,protocol):
                 m.put(msg.ERROR,'Bogus response %s from %s' % (ip, ip_service))
                 sys.exit(2)
     except Exception:
-        m.put(msg.ERROR,'% failed somehow' % curlcmd)
+        m.put(msg.ERROR,'%s failed somehow' % curlcmd)
         sys.exit(2)
     return ip
 
