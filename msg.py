@@ -1,7 +1,7 @@
 
 ERROR = 0                   # something is wrong
 ACTION = 1                  # successful completion, doing something
-NOACTION = 2                # successful completeion, doing nothing
+NOACTION = 2                # successful completion, doing nothing
 INFO = 3                    # information about progress
 
 class Msg:
