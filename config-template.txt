@@ -38,6 +38,7 @@ aaaa_name =
 #              A records.
 # 46 or 64     update A record with IPv6 address and update AAAA
 #              record with IPv6 address
+# none	       disables updating anything
 protocols = 4
 
 # verbosity level, controls how many messages the script emits.

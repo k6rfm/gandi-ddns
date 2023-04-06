@@ -86,7 +86,7 @@ def apply_config_defaults(sec):
         sec['aaaa_name'] = sec.get('a_name')
     if not sec.get('protocols'):
         sec['protocols'] = '4'
-    if sec['protocols'] not in ['4', '6', '46', '64']:
+    if sec['protocols'] not in ['4', '6', '46', '64', 'none']:
         m.put(msg.ERROR,'Invalid protocols value \"%s\", fix config.txt' % (
             sec['protocols']))
         sys.exit(2)
