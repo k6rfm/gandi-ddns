@@ -35,7 +35,7 @@ def get_ip(m,protocol):
         m.put(msg.ERROR,'Return code %d from %s' % (rc, curlcmd))
         sys.exit(2)
     if ip == "":
-        m.put(msg.ERROR,'Did not get ip from %s' % (rc, curlcmd))
+        m.put(msg.ERROR,'Did not get ip from %s despite rc=%d' % (curlcmd,rc))
     try:
         if protocol == '4':
             if not(ipaddress.IPv4Address(ip)): # check if valid IPv4 address
