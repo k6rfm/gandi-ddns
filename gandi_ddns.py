@@ -90,6 +90,8 @@ def apply_config_defaults(sec):
         m.put(msg.ERROR,'Invalid protocols value \"%s\", fix config.txt' % (
             sec['protocols']))
         sys.exit(2)
+    if sec['protocols'] = 'none':
+        sec['protocols'] = ''
     if not sec.get('ttl'):
         sec['ttl'] = '900'
     if not sec.get('api'):
