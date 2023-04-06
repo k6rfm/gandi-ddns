@@ -2,6 +2,13 @@
 # gandi.net API (Production) key
 apikey = XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
+# Web service to get public IP. Either 'ipify.org' or 'ifconfig.co'
+# if null, ipify.org is used.  If ipify.org is used, the requests
+# library is used, and the script should work on Windows.  If
+# ifconfig.co is used, a curl command is run and the script
+# probably won't work on Windows.
+ipservice = ipify.org
+
 # domain
 # if set to null, the suffix from socket.getfqdn() will be used.  Note
 # socket.getfqdn() requires the host to be configured with the DNS
@@ -31,6 +38,7 @@ aaaa_name =
 #              A records.
 # 46 or 64     update A record with IPv6 address and update AAAA
 #              record with IPv6 address
+# none	       disables updating anything
 protocols = 4
 
 # verbosity level, controls how many messages the script emits.

@@ -13,41 +13,53 @@ config_file = "config.txt"
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 
-def get_ip(m,protocol):
-    # ifconfig.co is used as api.ipify.org doesn't do ipv6 (the
-    # docs say it does, and I suspect the server code would work,
-    # but api.ipify.org doesn't have a AAAA record because the underlying
-    # web service doesn't do v6)
-    # ifconfig.co used to allow v4 and v6 subdomains to force
-    # protocols, but as of 2018-07-25 it no longer does.
-    # forcing requests.get to use a particular protocol is
-    # unpleasant (must fiddle with underlying socket) so
-    # we run curl in a popen.  This unfortunately means the 
-    # script won't run on Windows.
+def get_ip(m,ipservice,protocol):
+    # I've spent some time changing back and forth between ifconfig.co
+    # and ipify.org, as their IPv6 support has gone back and forth
+    # and changed in the way one accesses it.  I'm actually leaving
+    # the code for both in now, and allowing selection in the config.
 
-    curlcmd = 'curl -s%s http://ifconfig.co/' % protocol
+    if ipservice == "ipify.org":
+        # ipify.org currently (2021-08-02) allows selection of which
+        # protocol via the service name, so the requests package
+        # can be used, which means this script can work on Windows.
 
-    #Get external IP
-    p = os.popen(curlcmd)
-    ip = p.read().rstrip()
-    rc = p.close()
-    if rc:
-        m.put(msg.ERROR,'Return code %d from %s' % (rc, curlcmd))
+        serv = "http://api%s.ipify.org/" % protocol
+        ip = requests.get(serv).text
+    elif ipservice == "ifconfig.co":
+        # ifconfig.co used to allow v4 and v6 subdomains to force
+        # protocols, but as of 2018-07-25 it no longer does.
+        # forcing requests.get to use a particular protocol is
+        # upleasant (must fiddle with underlying socket) so
+        # we run curl in a popen.  This unfortunately means the 
+        # script won't run on Windows.
+
+        serv = 'curl -s%s http://ifconfig.co/' % protocol
+
+        p = os.popen(curlcmd)
+        ip = p.read().rstrip()
+        rc = p.close()
+        if rc:
+           m.put(msg.ERROR,'Return code %d from %s' % (rc, serv))
         sys.exit(2)
-    if ip == "":
-        m.put(msg.ERROR,'Did not get ip from %s despite rc=%d' % (curlcmd,rc))
+        if ip == "":
+            m.put(msg.ERROR,
+                  'Did not get ip from %s despite rc=%d' % (serv,rc))
+    else:
+        m.put(msg.ERROR, 'Unknown ipservice %s' % ipservice)
+
     try:
         if protocol == '4':
             if not(ipaddress.IPv4Address(ip)): # check if valid IPv4 address
-                m.put(msg.ERROR,'Bogus response %s from %s' % (ip, ip_service))
+                m.put(msg.ERROR,'Bogus response %s from %s' % (ip, serv))
                 sys.exit(2)
 
         if protocol == '6':
             if not(ipaddress.IPv6Address(ip)): # check if valid IPv6 address
-                m.put(msg.ERROR,'Bogus response %s from %s' % (ip, ip_service))
+                m.put(msg.ERROR,'Bogus response %s from %s' % (ip, serv))
                 sys.exit(2)
     except Exception:
-        m.put(msg.ERROR,'%s failed somehow' % curlcmd)
+        m.put(msg.ERROR,'%s failed somehow' % serv)
         sys.exit(2)
     return ip
 
@@ -58,6 +70,8 @@ def read_config(config_path):
     return cfg
 
 def apply_config_defaults(sec):
+    if not sec.get('ipservice'):
+        sec['ipservice'] = ipify.org
     fqdn = socket.getfqdn().split('.',1)
     if not sec.get('domain'):
         if len(fqdn) != 2:
@@ -73,10 +87,12 @@ def apply_config_defaults(sec):
         sec['aaaa_name'] = sec.get('a_name')
     if not sec.get('protocols'):
         sec['protocols'] = '4'
-    if sec['protocols'] not in ['4', '6', '46', '64']:
+    if sec['protocols'] not in ['4', '6', '46', '64', 'none']:
         m.put(msg.ERROR,'Invalid protocols value \"%s\", fix config.txt' % (
             sec['protocols']))
         sys.exit(2)
+    if sec['protocols'] == 'none':
+        sec['protocols'] = ''
     if not sec.get('ttl'):
         sec['ttl'] = '900'
     if not sec.get('api'):
@@ -193,7 +209,7 @@ def main():
             if record.status_code == 404:
                 # no old record, add it
                 # Discover External IP
-                external_ip = get_ip(m,protocol)
+                external_ip = get_ip(m,sec['ipservice'],protocol)
                 m.put(msg.ACTION,'No old %s record, adding as %s' % (
                         sec['recordtype'],
                         external_ip))
@@ -229,7 +245,7 @@ def main():
 
 
                 # Discover External IP
-                external_ip = get_ip(m,protocol)
+                external_ip = get_ip(m,sec['ipservice'],protocol)
                 m.put(msg.INFO,'External IP is: %s' % external_ip)
 
                 if old_ip == external_ip:
