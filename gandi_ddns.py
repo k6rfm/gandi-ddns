@@ -71,7 +71,7 @@ def read_config(config_path):
 
 def apply_config_defaults(sec):
     if not sec.get('ipservice'):
-        sec['ipservice'] = ipify.org
+        sec['ipservice'] = 'ipify.org'
     fqdn = socket.getfqdn().split('.',1)
     if not sec.get('domain'):
         if len(fqdn) != 2:
