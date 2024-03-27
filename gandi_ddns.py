@@ -47,6 +47,7 @@ def get_ip(m,ipservice,protocol):
                   'Did not get ip from %s despite rc=%d' % (serv,rc))
     else:
         m.put(msg.ERROR, 'Unknown ipservice %s' % ipservice)
+
     try:
         if protocol == '4':
             if not(ipaddress.IPv4Address(ip)): # check if valid IPv4 address
@@ -70,7 +71,7 @@ def read_config(config_path):
 
 def apply_config_defaults(sec):
     if not sec.get('ipservice'):
-        sec['ipservice'] = ipify.org
+        sec['ipservice'] = 'ipify.org'
     fqdn = socket.getfqdn().split('.',1)
     if not sec.get('domain'):
         if len(fqdn) != 2:
