@@ -4,7 +4,14 @@ http://doc.livedns.gandi.net/
 
 The script was developed for those behind a dynamic IP interface (e.g. home server/pi/nas).
 
-Forked by Rich McAllister (k6rfm) to supporting ipv6 (setting AAAA records.) This required changing to ifconfig.co as the IP service
+Forked by Rich McAllister (k6rfm) to supporting ipv6 (setting AAAA
+records.) This required changing to ifconfig.co as the IP service.
+Later changes to the services allowed changing back to ipify.org,
+the script now has the code for either and allows selection in the
+config.txt.  I've been using ipify.org for some time, and it is 
+preferable since it allows requests to be made in pure python
+instead of forking a curl. so the script should work on windows.
+Note that I have not tested it on Windows!
 
 The config-template.txt file should be renamed to config.txt, and modified with your gandi.net API key, domain name, and A-record (@, dev, home, pi, etc).
 
